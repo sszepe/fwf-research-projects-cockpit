@@ -1,4 +1,4 @@
-# FWF Research Cockpit
+# FWF Research Project Cockpit
 
 A lightweight **Vite + React + TypeScript** single-page application for exploring Austrian Science Fund (FWF) research projects, outputs, and researchers at your institution. Uses the [FWF Open API](https://www.fwf.ac.at/en/discover/open-api) — CC0 data, no login required.
 
