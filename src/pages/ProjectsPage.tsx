@@ -268,6 +268,11 @@ export function ProjectsPage() {
   const disciplineEntries = React.useMemo(() => sortedEntries(countBy(allProjects.flatMap(p => (p["_list.researchdisciplines.en"] || []).map(d => ({ d }))), x => x.d || null)), [allProjects]);
   const years = React.useMemo(() => allProjects.map(p => getYear(p["_date.startdate"]) || 0).filter(Boolean), [allProjects]);
 
+  const withOutputsCount = React.useMemo(
+    () => allProjects.filter(p => (p["_list.connected.output"] || []).length > 0).length,
+    [allProjects]
+  );
+
   const withFurtherFundingCount = React.useMemo(
     () => allProjects.filter(p => (p["_list.connected.further-funding"] || []).length > 0).length,
     [allProjects]
@@ -312,6 +317,7 @@ export function ProjectsPage() {
             <label className="ql-facet-label">
               <input type="checkbox" checked={onlyWithOutputs} onChange={e => { setOnlyWithOutputs(e.target.checked); setPage(0); }} />
               <span className="ql-facet-label-text">Has related outputs</span>
+              {!loading && <span className="ql-facet-count">{withOutputsCount}</span>}
             </label>
             <label className="ql-facet-label">
               <input type="checkbox" checked={onlyWithFurtherFunding} onChange={e => { setOnlyWithFurtherFunding(e.target.checked); setPage(0); }} />
