@@ -2,6 +2,8 @@ import React from "react";
 import {
   fetchAllOrgProjects,
   fetchOutputsByProjectId,
+  fetchFurtherFundingByProjectId,
+  furtherFundingTitle,
   textMatchProject,
   formatAmount,
   formatDate,
@@ -9,8 +11,9 @@ import {
   ORG_ROR,
   type FWFProject,
   type FWFOutput,
+  type FWFFurtherFunding,
 } from "../api/fwf";
-import { hrefFor, outputPath, personPath, personSlug, projectPath } from "../router";
+import { hrefFor, outputPath, personPath, personSlug, projectPath, furtherFundingPath } from "../router";
 
 const PAGE_SIZE = 20;
 
@@ -52,6 +55,7 @@ function exportCsv(projects: FWFProject[]) {
     ["Start Date", p => p["_date.startdate"] || ""],
     ["End Date", p => p["_date.enddate"] || ""],
     ["Grant DOI", p => p["_str.grantdoi"] || ""],
+    ["Further Funding Count", p => String((p["_list.connected.further-funding"] || []).length)],
   ];
 
   const escape = (v: string) => `"${v.replace(/"/g, '""')}"`;
@@ -123,7 +127,9 @@ function ProjectCard({ project }: { project: FWFProject }) {
   const [expanded, setExpanded] = React.useState(false);
   const [showJson, setShowJson] = React.useState(false);
   const [outputs, setOutputs] = React.useState<FWFOutput[]>([]);
+  const [furtherFundings, setFurtherFundings] = React.useState<FWFFurtherFunding[]>([]);
   const [loadingOut, setLoadingOut] = React.useState(false);
+  const [loadingFF, setLoadingFF] = React.useState(false);
 
   const title = project["_str.projecttitle.en"] || project["_str.projecttitle.de"] || "Untitled";
   const pi = [project["_str.principalinvestigator.firstname"], project["_str.principalinvestigator.lastname"]].filter(Boolean).join(" ");
@@ -140,6 +146,7 @@ function ProjectCard({ project }: { project: FWFProject }) {
   const orcidLink = project["_str.principalinvestigator.orcidlink"] || "";
   const disciplines = project["_list.researchdisciplines.en"] || [];
   const outputCount = (project["_list.connected.output"] || []).length;
+  const ffCount = (project["_list.connected.further-funding"] || []).length;
   const piSlug = pi ? personSlug(pi, institute, project["_str.principalinvestigator.orcid"] || "") : "";
 
   React.useEffect(() => {
@@ -150,7 +157,14 @@ function ProjectCard({ project }: { project: FWFProject }) {
         .catch(() => setOutputs([]))
         .finally(() => setLoadingOut(false));
     }
-  }, [expanded, outputs.length, outputCount, project.id]);
+    if (expanded && furtherFundings.length === 0 && ffCount > 0) {
+      setLoadingFF(true);
+      fetchFurtherFundingByProjectId(project.id)
+        .then(setFurtherFundings)
+        .catch(() => setFurtherFundings([]))
+        .finally(() => setLoadingFF(false));
+    }
+  }, [expanded, outputs.length, outputCount, furtherFundings.length, ffCount, project.id]);
 
   return (
     <>
@@ -163,6 +177,11 @@ function ProjectCard({ project }: { project: FWFProject }) {
           {program && <span className="result-program">{program}</span>}
           {pi && <span>{piSlug ? <a className="router-link" href={hrefFor(personPath(piSlug))} onClick={e => e.stopPropagation()}>{pi}</a> : pi}{institute && ` · ${institute}`}</span>}
           {start && <span>{formatDate(start)} – {formatDate(end)}</span>}
+          {ffCount > 0 && (
+            <span className="result-badge badge-other" title="Has further funding records">
+              +{ffCount} further funding
+            </span>
+          )}
         </div>
 
         {expanded && (
@@ -175,6 +194,36 @@ function ProjectCard({ project }: { project: FWFProject }) {
               {disciplines.length > 0 && <div className="expand-field"><h4>Disciplines</h4><p>{disciplines.join(", ")}</p></div>}
               {keywords.length > 0 && <div className="expand-field" style={{ gridColumn: "1 / -1" }}><h4>Keywords</h4><div>{keywords.slice(0, 20).map((kw, i) => <span key={i} className="kw-chip">{kw}</span>)}</div></div>}
             </div>
+
+            {/* Further Funding section */}
+            {ffCount > 0 && (
+              <div className="expand-field" style={{ gridColumn: "1 / -1", marginTop: 12 }}>
+                <h4>Further Funding ({ffCount})</h4>
+                {loadingFF ? (
+                  <div className="mini-spinner">Loading further funding…</div>
+                ) : furtherFundings.length > 0 ? (
+                  <ul className="output-mini-list">
+                    {furtherFundings.map(ff => (
+                      <li key={ff.id}>
+                        <div style={{ fontWeight: 700, fontSize: 14 }}>
+                          <a className="router-link" href={hrefFor(furtherFundingPath(ff.id))}>
+                            {furtherFundingTitle(ff)}
+                          </a>
+                        </div>
+                        <div style={{ fontSize: 12, color: "var(--muted)" }}>
+                          {[
+                            ff["_str.funderabbreviation"] || ff["_str.funder"],
+                            ff["_str.grantnumber"],
+                          ].filter(Boolean).join(" · ")}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p style={{ fontSize: 12, color: "var(--muted)" }}>No further funding details found.</p>
+                )}
+              </div>
+            )}
 
             <div className="expand-field" style={{ gridColumn: "1 / -1" }}>
               <h4>Related Outputs ({outputCount})</h4>
@@ -206,6 +255,7 @@ export function ProjectsPage() {
   const [startMin, setStartMin] = React.useState<number | null>(null);
   const [startMax, setStartMax] = React.useState<number | null>(null);
   const [onlyWithOutputs, setOnlyWithOutputs] = React.useState(false);
+  const [onlyWithFurtherFunding, setOnlyWithFurtherFunding] = React.useState(false);
 
   React.useEffect(() => {
     fetchAllOrgProjects(ORG_ROR)
@@ -218,6 +268,11 @@ export function ProjectsPage() {
   const disciplineEntries = React.useMemo(() => sortedEntries(countBy(allProjects.flatMap(p => (p["_list.researchdisciplines.en"] || []).map(d => ({ d }))), x => x.d || null)), [allProjects]);
   const years = React.useMemo(() => allProjects.map(p => getYear(p["_date.startdate"]) || 0).filter(Boolean), [allProjects]);
 
+  const withFurtherFundingCount = React.useMemo(
+    () => allProjects.filter(p => (p["_list.connected.further-funding"] || []).length > 0).length,
+    [allProjects]
+  );
+
   const filtered = React.useMemo(() => {
     let list = allProjects;
     if (query) list = list.filter(p => textMatchProject(p, query));
@@ -227,13 +282,16 @@ export function ProjectsPage() {
     if (startMin !== null) list = list.filter(p => { const y = getYear(p["_date.startdate"]) || 0; return !y || y >= startMin; });
     if (startMax !== null) list = list.filter(p => { const y = getYear(p["_date.startdate"]) || 0; return !y || y <= startMax; });
     if (onlyWithOutputs) list = list.filter(p => (p["_list.connected.output"] || []).length > 0);
+    if (onlyWithFurtherFunding) list = list.filter(p => (p["_list.connected.further-funding"] || []).length > 0);
     return list;
-  }, [allProjects, query, selStatus, selProgram, selDiscipline, startMin, startMax, onlyWithOutputs]);
+  }, [allProjects, query, selStatus, selProgram, selDiscipline, startMin, startMax, onlyWithOutputs, onlyWithFurtherFunding]);
 
   const pageTotal = filtered.length;
   const totalPages = Math.max(1, Math.ceil(pageTotal / PAGE_SIZE));
   const pageProjects = React.useMemo(() => filtered.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE), [filtered, page]);
   React.useEffect(() => { if (page > totalPages - 1) setPage(0); }, [page, totalPages]);
+
+  const hasActiveFilters = query || selStatus.size || selProgram.size || selDiscipline.size || startMin !== null || startMax !== null || onlyWithOutputs || onlyWithFurtherFunding;
 
   return (
     <div>
@@ -241,6 +299,7 @@ export function ProjectsPage() {
       <div className="stats-bar">
         <div className="stat-card"><div className="stat-value">{loading ? "…" : allProjects.length}</div><div className="stat-label">Total Projects</div></div>
         <div className="stat-card"><div className="stat-value">{loading ? "…" : allProjects.filter(p => isActiveStatus(p["_str.status.en"] || p["_str.status.de"] || "")).length}</div><div className="stat-label">Active Projects</div></div>
+        <div className="stat-card"><div className="stat-value">{loading ? "…" : withFurtherFundingCount}</div><div className="stat-label">With Further Funding</div></div>
       </div>
       {error && <div className="error-banner">{error}</div>}
       {loading ? <div className="app-loading"><div className="spinner" /><span>Loading projects…</span></div> : <div className="ql-grid">
@@ -249,10 +308,20 @@ export function ProjectsPage() {
           <FacetBox title="Programme"><FacetList entries={programEntries} selected={selProgram} onToggle={v => { setSelProgram(prev => { const n = new Set(prev); n.has(v) ? n.delete(v) : n.add(v); return n; }); setPage(0); }} /></FacetBox>
           <FacetBox title="Start Year"><YearRangeInput min={startMin} max={startMax} years={years} onChange={(a, b) => { setStartMin(a); setStartMax(b); setPage(0); }} /></FacetBox>
           <FacetBox title="Disciplines"><FacetList entries={disciplineEntries} selected={selDiscipline} onToggle={v => { setSelDiscipline(prev => { const n = new Set(prev); n.has(v) ? n.delete(v) : n.add(v); return n; }); setPage(0); }} maxVisible={10} /></FacetBox>
-          <FacetBox title="Options"><label className="ql-facet-label"><input type="checkbox" checked={onlyWithOutputs} onChange={e => { setOnlyWithOutputs(e.target.checked); setPage(0); }} /><span className="ql-facet-label-text">Has related outputs</span></label></FacetBox>
+          <FacetBox title="Options">
+            <label className="ql-facet-label">
+              <input type="checkbox" checked={onlyWithOutputs} onChange={e => { setOnlyWithOutputs(e.target.checked); setPage(0); }} />
+              <span className="ql-facet-label-text">Has related outputs</span>
+            </label>
+            <label className="ql-facet-label">
+              <input type="checkbox" checked={onlyWithFurtherFunding} onChange={e => { setOnlyWithFurtherFunding(e.target.checked); setPage(0); }} />
+              <span className="ql-facet-label-text">Has further funding</span>
+              {!loading && <span className="ql-facet-count">{withFurtherFundingCount}</span>}
+            </label>
+          </FacetBox>
         </aside>
         <div className="ql-right">
-          <div className="ql-search-bar"><div className="ql-search-controls"><input className="ql-search-input" placeholder="Search all projects..." value={inputVal} onChange={e => setInputVal(e.target.value)} onKeyDown={e => { if (e.key === "Enter") { setQuery(inputVal); setPage(0); } }} /><button className="ql-btn-search" onClick={() => { setQuery(inputVal); setPage(0); }}>Search</button><button className="btn btn-export" onClick={() => exportCsv(filtered)}>Export CSV</button>{(query || selStatus.size || selProgram.size || selDiscipline.size || startMin !== null || startMax !== null || onlyWithOutputs) ? <button className="ql-btn-reset" onClick={() => { setInputVal(""); setQuery(""); setSelStatus(new Set()); setSelProgram(new Set()); setSelDiscipline(new Set()); setStartMin(null); setStartMax(null); setOnlyWithOutputs(false); setPage(0); }}>Reset</button> : null}</div></div>
+          <div className="ql-search-bar"><div className="ql-search-controls"><input className="ql-search-input" placeholder="Search all projects..." value={inputVal} onChange={e => setInputVal(e.target.value)} onKeyDown={e => { if (e.key === "Enter") { setQuery(inputVal); setPage(0); } }} /><button className="ql-btn-search" onClick={() => { setQuery(inputVal); setPage(0); }}>Search</button><button className="btn btn-export" onClick={() => exportCsv(filtered)}>Export CSV</button>{hasActiveFilters ? <button className="ql-btn-reset" onClick={() => { setInputVal(""); setQuery(""); setSelStatus(new Set()); setSelProgram(new Set()); setSelDiscipline(new Set()); setStartMin(null); setStartMax(null); setOnlyWithOutputs(false); setOnlyWithFurtherFunding(false); setPage(0); }}>Reset</button> : null}</div></div>
           <div className="ql-results-panel"><div className="ql-results-header"><div><span className="ql-results-title">Results</span><span className="ql-results-count">{pageTotal} project{pageTotal !== 1 ? "s" : ""}</span></div><span className="ql-results-page">Page {Math.min(page + 1, totalPages)} / {totalPages}</span></div>
             {pageProjects.length === 0 ? <div className="empty-state">No projects found for this filter combination.</div> : <>{pageProjects.map(project => <ProjectCard key={project.id} project={project} />)}{totalPages > 1 && <div className="ql-pagination"><button className="ql-page-btn" disabled={page === 0} onClick={() => setPage(p => p - 1)}>← Prev</button><span className="ql-page-label">Page {page + 1} of {totalPages}</span><button className="ql-page-btn" disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)}>Next →</button></div>}</>}
           </div>

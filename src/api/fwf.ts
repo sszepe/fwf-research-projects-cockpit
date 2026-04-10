@@ -82,6 +82,24 @@ export interface FWFOutput {
   [key: string]: unknown;
 }
 
+export interface FWFFurtherFunding {
+  id: string;
+  "_str.title"?: string;
+  "_str.funder"?: string;
+  "_str.funderabbreviation"?: string;
+  "_str.programname"?: string;
+  "_str.grantnumber"?: string;
+  "_str.grantdoi"?: string;
+  "_str.url"?: string;
+  "_str.status"?: string;
+  "_long.approvedamount"?: number;
+  "_str.currency"?: string;
+  "_date.startdate"?: string;
+  "_date.enddate"?: string;
+  "_list.connected.projects"?: string[];
+  [key: string]: unknown;
+}
+
 export interface PersonRecord {
   id: string;
   slug: string;
@@ -117,7 +135,7 @@ function normalizeProjectToken(value: string): string {
   return value.replace(/^project[.-]/i, "");
 }
 
-async function postSearch<T>(index: "projects" | "output", body: Record<string, unknown>): Promise<T[]> {
+async function postSearch<T>(index: "projects" | "output" | "further-funding", body: Record<string, unknown>): Promise<T[]> {
   const res = await fetch(`${API_BASE}/indexes/${index}/search`, {
     method: "POST",
     headers: authHeaders(),
@@ -204,7 +222,6 @@ export async function fetchOutputsByProjectId(projectId: string): Promise<FWFOut
 
   const outputs = await postSearch<FWFOutput>("output", { q: query, limit: 1000 });
 
-  // Helpful debug while fixing
   console.log(`Query ${query} returned ${outputs.length} outputs`);
 
   return outputs;
@@ -262,6 +279,36 @@ export async function fetchProjectsByOutputId(outputId: string): Promise<FWFProj
 
   return uniqById(hits);
 }
+
+// ---------------------------------------------------------------------------
+// Further Funding
+// ---------------------------------------------------------------------------
+
+export async function fetchFurtherFundingByProjectId(projectId: string): Promise<FWFFurtherFunding[]> {
+  const bareId = projectId.replace(/^project[-.]/i, "");
+  const query = `"project-${bareId}"`;
+  const hits = await postSearch<FWFFurtherFunding>("further-funding", { q: query, limit: 1000 });
+  console.log(`Further-funding query "${query}" returned ${hits.length} records`);
+  return hits;
+}
+
+export async function fetchFurtherFundingById(fundingId: string): Promise<FWFFurtherFunding | null> {
+  const hits = await postSearch<FWFFurtherFunding>("further-funding", { q: `"${fundingId}"`, limit: 20 }).catch(() => []);
+  return hits.find(f => f.id === fundingId) || hits[0] || null;
+}
+
+export async function fetchProjectsByFurtherFundingId(fundingId: string): Promise<FWFProject[]> {
+  const hits = await postSearch<FWFProject>("projects", { q: `"${fundingId}"`, limit: 100 }).catch(() => []);
+  return uniqById(hits.filter(p => (p["_list.connected.further-funding"] || []).includes(fundingId)));
+}
+
+export function furtherFundingTitle(f: FWFFurtherFunding): string {
+  return f["_str.title"] || f["_str.programname"] || f.id || "Untitled";
+}
+
+// ---------------------------------------------------------------------------
+// Persons
+// ---------------------------------------------------------------------------
 
 export function buildPersonsIndex(projects: FWFProject[]): PersonRecord[] {
   const map = new Map<string, PersonRecord>();
@@ -403,9 +450,9 @@ export async function getIndexStats(): Promise<Record<string, { numberOfDocument
   return result;
 }
 
-export function formatAmount(v?: number): string {
+export function formatAmount(v?: number, currency = "EUR"): string {
   if (typeof v !== "number") return "";
-  return new Intl.NumberFormat("de-AT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(v);
+  return new Intl.NumberFormat("de-AT", { style: "currency", currency, maximumFractionDigits: 0 }).format(v);
 }
 
 export function formatDate(v?: string): string {

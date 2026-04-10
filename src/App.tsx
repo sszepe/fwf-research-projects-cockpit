@@ -9,6 +9,7 @@ import { PersonPage } from "./pages/PersonPage";
 import { ProjectDetailPage } from "./pages/ProjectDetailPage";
 import { OutputDetailPage } from "./pages/OutputDetailPage";
 import { PersonDetailPage } from "./pages/PersonDetailPage";
+import { FurtherFundingDetailPage } from "./pages/FurtherFundingDetailPage";
 import { hrefFor, useHashLocation } from "./router";
 
 const TABS = [
@@ -53,6 +54,8 @@ export default function App() {
 
         {section === "persons" && !itemId && <PersonPage />}
         {section === "persons" && !!itemId && <PersonDetailPage slug={itemId} />}
+
+        {section === "further-funding" && !!itemId && <FurtherFundingDetailPage fundingId={itemId} />}
 
         {section === "doi" && <DoiSearchPage />}
         {section === "about" && <AboutPage />}
