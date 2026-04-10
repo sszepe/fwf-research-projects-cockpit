@@ -10,12 +10,14 @@ import { ProjectDetailPage } from "./pages/ProjectDetailPage";
 import { OutputDetailPage } from "./pages/OutputDetailPage";
 import { PersonDetailPage } from "./pages/PersonDetailPage";
 import { FurtherFundingDetailPage } from "./pages/FurtherFundingDetailPage";
+import { FurtherFundingPage } from "./pages/FurtherFundingPage";
 import { hrefFor, useHashLocation } from "./router";
 
 const TABS = [
   { key: "/projects", label: "Projects" },
   { key: "/outputs", label: "Outputs" },
   { key: "/persons", label: "Persons" },
+  { key: "/further-funding", label: "Further Fundings" },
   { key: "/doi", label: "DOI / ID Search" },
   { key: "/about", label: "About" },
 ] as const;
@@ -55,6 +57,7 @@ export default function App() {
         {section === "persons" && !itemId && <PersonPage />}
         {section === "persons" && !!itemId && <PersonDetailPage slug={itemId} />}
 
+        {section === "further-funding" && !itemId && <FurtherFundingPage />}
         {section === "further-funding" && !!itemId && <FurtherFundingDetailPage fundingId={itemId} />}
 
         {section === "doi" && <DoiSearchPage />}
