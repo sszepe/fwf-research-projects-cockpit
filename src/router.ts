@@ -30,6 +30,10 @@ export function outputPath(outputId: string): string {
   return `/outputs/${outputId}`;
 }
 
+export function furtherFundingPath(fundingId: string): string {
+  return `/further-funding/${fundingId}`;
+}
+
 export function personSlug(name: string, institution = "", orcid = ""): string {
   if (orcid) return `orcid-${orcid.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
   return `${name} ${institution}`

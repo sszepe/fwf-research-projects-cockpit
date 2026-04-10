@@ -1,17 +1,32 @@
 import React from "react";
-import { fetchProjectById, fetchOutputsByProjectId, formatAmount, formatDate, type FWFOutput, type FWFProject } from "../api/fwf";
-import { hrefFor, outputPath, personPath, personSlug } from "../router";
+import {
+  fetchProjectById,
+  fetchOutputsByProjectId,
+  fetchFurtherFundingByProjectId,
+  furtherFundingTitle,
+  formatAmount,
+  formatDate,
+  type FWFOutput,
+  type FWFProject,
+  type FWFFurtherFunding,
+} from "../api/fwf";
+import { hrefFor, outputPath, personPath, personSlug, furtherFundingPath } from "../router";
 
 export function ProjectDetailPage({ projectId }: { projectId: string }) {
   const [project, setProject] = React.useState<FWFProject | null>(null);
   const [outputs, setOutputs] = React.useState<FWFOutput[]>([]);
+  const [furtherFundings, setFurtherFundings] = React.useState<FWFFurtherFunding[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState("");
 
   React.useEffect(() => {
     setLoading(true);
-    Promise.all([fetchProjectById(projectId), fetchOutputsByProjectId(projectId)])
-      .then(([p, outs]) => { setProject(p); setOutputs(outs); })
+    Promise.all([
+      fetchProjectById(projectId),
+      fetchOutputsByProjectId(projectId),
+      fetchFurtherFundingByProjectId(projectId),
+    ])
+      .then(([p, outs, ff]) => { setProject(p); setOutputs(outs); setFurtherFundings(ff); })
       .catch((e: any) => setError(e?.message || "Failed to load project"))
       .finally(() => setLoading(false));
   }, [projectId]);
@@ -43,6 +58,35 @@ export function ProjectDetailPage({ projectId }: { projectId: string }) {
         </tbody></table>
         {(project["_str.prproposalsummary.en"] || project["_str.prproposalsummary.de"]) && <div style={{ marginTop: 12 }}><div className="detail-label">Summary</div><p style={{ color: "var(--muted)" }}>{project["_str.prproposalsummary.en"] || project["_str.prproposalsummary.de"]}</p></div>}
       </div></div>
+
+      <div className="ql-results-panel" style={{ marginBottom: 16 }}>
+        <div className="ql-results-header">
+          <span className="ql-results-title">Further Funding</span>
+          <span className="ql-results-count">{furtherFundings.length}</span>
+        </div>
+        {furtherFundings.length === 0 ? (
+          <div className="empty-state">No further funding records found.</div>
+        ) : (
+          <div style={{ padding: "12px 14px" }}>
+            {furtherFundings.map(ff => (
+              <div key={ff.id} className="detail-list-item">
+                <a className="router-link" href={hrefFor(furtherFundingPath(ff.id))}>
+                  {furtherFundingTitle(ff)}
+                </a>
+                <div className="detail-submeta">
+                  {[
+                    ff["_str.funderabbreviation"] || ff["_str.funder"],
+                    ff["_str.grantnumber"],
+                    typeof ff["_long.approvedamount"] === "number"
+                      ? formatAmount(ff["_long.approvedamount"], ff["_str.currency"] || "EUR")
+                      : null,
+                  ].filter(Boolean).join(" · ")}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       <div className="ql-results-panel"><div className="ql-results-header"><span className="ql-results-title">Related Outputs</span><span className="ql-results-count">{outputs.length}</span></div>{outputs.length === 0 ? <div className="empty-state">No related outputs found.</div> : <div style={{ padding: "12px 14px" }}>{outputs.map(out => <div key={out.id} className="detail-list-item"><a className="router-link" href={hrefFor(outputPath(String(out.id)))}>{String(out["_str.title"] || "Untitled Output")}</a><div className="detail-submeta">{String(out["_str.category"] || "")}{out["_str.year"] ? ` · ${String(out["_str.year"])}` : ""}</div></div>)}</div>}</div>
     </div>
