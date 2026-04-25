@@ -1,0 +1,22 @@
+| Library | Version | Scope | License |
+|---|---:|---|---|
+| react | 18.3.1 | production | MIT |
+| react-dom | 18.3.1 | production | MIT |
+| loose-envify | 1.4.0 | production | MIT |
+| js-tokens | 4.0.0 | production | MIT |
+| scheduler | 0.23.2 | production | MIT |
+| @types/react | 18.3.28 | dev | MIT |
+| @types/react-dom | 18.3.7 | dev | MIT |
+| @vitejs/plugin-react | 4.7.0 | dev | MIT |
+| typescript | 5.9.3 | dev | Apache-2.0 |
+| vite | 5.4.21 | dev | MIT |
+| rollup | 4.60.1 | dev | MIT |
+| esbuild | 0.21.5 | dev | MIT |
+| postcss | 8.5.8 | dev | MIT |
+| source-map-js | 1.2.1 | dev | BSD-3-Clause |
+| caniuse-lite | 1.0.30001786 | dev | CC-BY-4.0 |
+| electron-to-chromium | 1.5.332 | dev | ISC |
+| semver | 6.3.1 | dev | ISC |
+| picocolors | 1.1.1 | dev | ISC |
+| lru-cache | 5.1.1 | dev | ISC |
+| yallist | 3.1.1 | dev | ISC |
